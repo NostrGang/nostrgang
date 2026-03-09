@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NOSTRGANG</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=Oswald:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --black: #0a0a0a;
+    --deep: #111111;
+    --surface: #1a1a1a;
+    --border: #2a2a2a;
+    --yellow: #f5e642;
+    --orange: #ff6b1a;
+    --red: #e81c1c;
+    --green: #00ff88;
+    --white: #f0ede6;
+    --gray: #888;
+    --gang-font: 'Bebas Neue', sans-serif;
+    --mono: 'Space Mono', monospace;
+    --body-font: 'Oswald', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--black);
+    color: var(--white);
+    font-family: var(--body-font);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.5;
+  }
+
+  .ticker {
+    background: var(--yellow);
+    color: var(--black);
+    font-family: var(--gang-font);
+    font-size: 13px;
+    letter-spacing: 4px;
+    padding: 5px 0;
+    overflow: hidden;
+    white-space: nowrap;
+    border-bottom: 3px solid var(--orange);
+  }
+  .ticker-inner { display: inline-block; animation: marquee 35s linear infinite; }
+  @keyframes marquee {
+    from { transform: translateX(100vw); }
+    to { transform: translateX(-100%); }
+  }
+
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 200;
+    background: var(--black);
+    border-bottom: 3px solid var(--yellow);
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+    gap: 16px;
+  }
+
+  .logo-wrap { display: flex; align-items: baseline; gap: 8px; }
+  .logo {
+    font-family: var(--gang-font);
+    font-size: 40px;
+    letter-spacing: 6px;
+    color: var(--yellow);
+    line-height: 1;
+    text-shadow: 3px 3px 0 var(--orange), 6px 6px 0 #0a0a0a;
+    flex-shrink: 0;
+  }
+  .logo-tag { font-family: var(--mono); font-size: 10px; color: var(--orange); letter-spacing: 3px; }
+
+  .header-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+
+  .status-dot { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 10px; color: var(--gray); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #888; animation: pulse 2s infinite; flex-shrink: 0; }
+  .dot.live { background: var(--green); }
+  .dot.connecting { background: var(--yellow); }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  .login-btn {
+    background: none;
+    border: 2px solid var(--yellow);
+    color: var(--yellow);
+    font-family: var(--gang-font);
+    font-size: 15px;
+    letter-spacing: 3px;
+    padding: 6px 16px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .login-btn:hover { background: var(--yellow); color: var(--black); }
+
+  .user-chip {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 4px 10px 4px 4px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .user-chip:hover { border-color: var(--red); }
+  .user-chip.visible { display: flex; }
+  .chip-avatar {
+    width: 30px; height: 30px;
+    border-radius: 2px;
+    background: var(--border);
+    font-family: var(--gang-font);
+    font-size: 14px;
+    color: var(--yellow);
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden; flex-shrink: 0;
+  }
+  .chip-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .chip-name { font-family: var(--body-font); font-weight: 700; font-size: 13px; letter-spacing: 1px; color: var(--white); max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip-logout { font-family: var(--mono); font-size: 9px; color: var(--gray); letter-spacing: 1px; }
+
+  .relay-bar {
+    background: var(--deep);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 24px;
+    display: flex; gap: 8px; align-items: center;
+    overflow-x: auto; scrollbar-width: none;
+  }
+  .relay-bar::-webkit-scrollbar { display: none; }
+  .relay-label { font-family: var(--mono); font-size: 10px; color: var(--gray); white-space: nowrap; letter-spacing: 2px; }
+  .relay-pill {
+    font-family: var(--mono); font-size: 10px; padding: 3px 10px;
+    border-radius: 2px; border: 1px solid var(--border); color: var(--gray);
+    white-space: nowrap; transition: all 0.3s;
+  }
+  .relay-pill.connected { border-color: #00ff8866; color: var(--green); background: #00ff8811; }
+
+  /* COMPOSE */
+  .compose-wrap { max-width: 680px; margin: 0 auto; padding: 20px 16px 0; display: none; }
+  .compose-wrap.visible { display: block; }
+  .compose-box { background: var(--deep); border: 2px solid var(--yellow); }
+  .compose-header { padding: 10px 16px; border-bottom: 1px solid var(--border); }
+  .compose-title { font-family: var(--gang-font); font-size: 16px; letter-spacing: 3px; color: var(--yellow); }
+  .compose-textarea {
+    width: 100%; background: transparent; border: none; outline: none;
+    color: var(--white); font-family: var(--body-font); font-weight: 300;
+    font-size: 16px; line-height: 1.55; padding: 14px 16px;
+    resize: none; min-height: 90px; letter-spacing: 0.3px;
+  }
+  .compose-textarea::placeholder { color: var(--gray); }
+  .compose-footer { padding: 10px 16px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .char-count { font-family: var(--mono); font-size: 11px; color: var(--gray); letter-spacing: 1px; }
+  .char-count.warn { color: var(--orange); }
+  .char-count.over { color: var(--red); }
+  .post-btn {
+    background: var(--yellow); border: none; color: var(--black);
+    font-family: var(--gang-font); font-size: 16px; letter-spacing: 3px;
+    padding: 8px 24px; cursor: pointer; transition: all 0.15s;
+  }
+  .post-btn:hover { background: var(--orange); color: var(--white); }
+  .post-btn:disabled { opacity: 0.4; cursor: default; }
+
+  .nip07-prompt {
+    background: var(--deep); border: 1px solid var(--border);
+    border-left: 3px solid var(--orange); padding: 14px 18px;
+    margin-top: 12px; display: none;
+  }
+  .nip07-prompt.visible { display: block; }
+  .nip07-title { font-family: var(--gang-font); font-size: 16px; letter-spacing: 3px; color: var(--orange); margin-bottom: 6px; }
+  .nip07-text { font-family: var(--mono); font-size: 11px; color: var(--gray); line-height: 1.6; }
+  .nip07-text a { color: var(--yellow); }
+
+  /* FEED */
+  .container { max-width: 680px; margin: 0 auto; padding: 0 16px; }
+  .feed-header { padding: 20px 0 14px; display: flex; align-items: center; justify-content: space-between; }
+  .feed-title { font-family: var(--gang-font); font-size: 26px; letter-spacing: 4px; color: var(--white); }
+  .feed-title span { color: var(--yellow); }
+  .note-count { font-family: var(--mono); font-size: 11px; color: var(--gray); letter-spacing: 2px; }
+
+  .loading-state { padding: 60px 0; text-align: center; }
+  .loading-gang { font-family: var(--gang-font); font-size: 52px; letter-spacing: 8px; color: var(--yellow); animation: flicker 1.8s infinite; }
+  @keyframes flicker {
+    0%, 94%, 100% { opacity: 1; } 95% { opacity: 0.2; } 97% { opacity: 0.9; } 98% { opacity: 0.1; }
+  }
+  .loading-sub { font-family: var(--mono); font-size: 12px; color: var(--gray); letter-spacing: 3px; margin-top: 12px; }
+
+  .new-banner {
+    background: var(--yellow); color: var(--black);
+    font-family: var(--gang-font); font-size: 14px; letter-spacing: 3px;
+    text-align: center; padding: 8px; cursor: pointer;
+    display: none; border: none; width: 100%; transition: background 0.15s;
+  }
+  .new-banner:hover { background: var(--orange); color: var(--white); }
+  .new-banner.visible { display: block; }
+
+  .notes-list { display: flex; flex-direction: column; }
+
+  .note-card {
+    background: var(--deep); border: 1px solid var(--border); border-top: none;
+    padding: 16px 20px; transition: background 0.15s;
+    animation: slideIn 0.3s ease-out; position: relative;
+  }
+  .note-card:first-child { border-top: 1px solid var(--border); }
+  .note-card::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+    width: 3px; background: transparent; transition: background 0.2s;
+  }
+  .note-card:hover { background: var(--surface); }
+  .note-card:hover::before { background: var(--yellow); }
+  .note-card.own-note::before { background: var(--orange) !important; }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+
+  .note-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .note-avatar {
+    width: 38px; height: 38px; border-radius: 2px; border: 2px solid var(--border);
+    background: var(--surface); flex-shrink: 0; font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--gang-font); color: var(--yellow); overflow: hidden;
+  }
+  .note-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .note-user { flex: 1; min-width: 0; }
+  .note-name { font-family: var(--body-font); font-weight: 700; font-size: 15px; letter-spacing: 1px; color: var(--white); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: uppercase; }
+  .note-pubkey { font-family: var(--mono); font-size: 10px; color: var(--gray); }
+  .note-time { font-family: var(--mono); font-size: 10px; color: var(--gray); white-space: nowrap; flex-shrink: 0; }
+  .note-content { font-family: var(--body-font); font-weight: 300; font-size: 16px; line-height: 1.55; color: var(--white); word-break: break-word; white-space: pre-wrap; }
+  .note-content a { color: var(--yellow); text-decoration: none; border-bottom: 1px solid var(--yellow); }
+  .note-content a:hover { color: var(--orange); border-color: var(--orange); }
+
+  .error-state { padding: 48px 0; text-align: center; display: none; }
+  .error-title { font-family: var(--gang-font); font-size: 36px; letter-spacing: 4px; color: var(--red); margin-bottom: 8px; }
+  .error-msg { font-family: var(--mono); font-size: 12px; color: var(--gray); }
+
+  .refresh-btn {
+    background: none; border: 1px solid var(--yellow); color: var(--yellow);
+    font-family: var(--gang-font); font-size: 14px; letter-spacing: 3px;
+    padding: 5px 14px; cursor: pointer; transition: all 0.15s;
+  }
+  .refresh-btn:hover { background: var(--yellow); color: var(--black); }
+  .refresh-btn:disabled { opacity: 0.4; cursor: default; }
+
+  .toast {
+    position: fixed; bottom: 32px; left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--surface); border: 2px solid var(--yellow);
+    color: var(--white); font-family: var(--mono); font-size: 12px;
+    letter-spacing: 2px; padding: 12px 24px; z-index: 10000;
+    opacity: 0; transition: all 0.3s; white-space: nowrap; pointer-events: none;
+  }
+  .toast.success { border-color: var(--green); color: var(--green); }
+  .toast.error { border-color: var(--red); color: var(--red); }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  footer { margin-top: 60px; padding: 24px; border-top: 1px solid var(--border); text-align: center; }
+  .footer-text { font-family: var(--mono); font-size: 11px; color: var(--border); letter-spacing: 3px; text-transform: uppercase; }
+  .footer-text span { color: var(--yellow); }
+
+  @media (max-width: 500px) {
+    .logo { font-size: 30px; }
+    header { padding: 0 12px; gap: 8px; }
+    .logo-tag { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="ticker">
+  <span class="ticker-inner">◆ NOSTRGANG ◆ DECENTRALIZED ◆ CENSORSHIP RESISTANT ◆ NO MASTERS ◆ YOUR KEYS YOUR SPEECH ◆ BUILT ON NOSTR ◆ NIP-01 ◆ NIP-07 ◆ NOSTRGANG ◆ DECENTRALIZED ◆ CENSORSHIP RESISTANT ◆ NO MASTERS ◆ YOUR KEYS YOUR SPEECH ◆ BUILT ON NOSTR ◆ NIP-01 ◆ NIP-07 ◆</span>
+</div>
+
+<header>
+  <div class="logo-wrap">
+    <div class="logo">NOSTRGANG</div>
+    <div class="logo-tag">// public feed</div>
+  </div>
+  <div class="header-right">
+    <div class="status-dot">
+      <div class="dot connecting" id="statusDot"></div>
+      <span id="statusText">CONNECTING</span>
+    </div>
+    <button class="login-btn" id="loginBtn" onclick="loginWithNip07()">⚡ LOGIN</button>
+    <div class="user-chip" id="userChip" onclick="logout()">
+      <div class="chip-avatar" id="chipAvatar">?</div>
+      <div>
+        <div class="chip-name" id="chipName">ANON</div>
+        <div class="chip-logout">LOGOUT ✕</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="relay-bar">
+  <span class="relay-label">RELAYS ▸</span>
+  <span class="relay-pill" id="relay-0">relay.damus.io</span>
+  <span class="relay-pill" id="relay-1">nos.lol</span>
+  <span class="relay-pill" id="relay-2">relay.nostr.band</span>
+  <span class="relay-pill" id="relay-3">nostr.wine</span>
+</div>
+
+<div class="compose-wrap" id="composeWrap">
+  <div class="compose-box">
+    <div class="compose-header">
+      <span class="compose-title">◆ POST TO GANG</span>
+    </div>
+    <textarea
+      class="compose-textarea"
+      id="composeText"
+      placeholder="What's the word on the street..."
+      oninput="updateCharCount()"
+    ></textarea>
+    <div class="compose-footer">
+      <span class="char-count" id="charCount">0 / 280</span>
+      <button class="post-btn" id="postBtn" onclick="publishNote()" disabled>BROADCAST ◆</button>
+    </div>
+  </div>
+  <div class="nip07-prompt" id="nip07Prompt">
+    <div class="nip07-title">NO SIGNER DETECTED</div>
+    <div class="nip07-text">
+      You need a NIP-07 browser extension to sign and publish notes.<br>
+      Install <a href="https://getalby.com" target="_blank">Alby</a>,
+      <a href="https://github.com/fiatjaf/nos2x" target="_blank">nos2x</a>, or
+      <a href="https://nostr.com/clients" target="_blank">another NIP-07 signer</a>, then refresh.
+    </div>
+  </div>
+</div>
+
+<div class="container">
+  <div class="feed-header">
+    <div class="feed-title">LIVE <span>FEED</span></div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span class="note-count" id="noteCount">0 NOTES</span>
+      <button class="refresh-btn" id="refreshBtn" onclick="reconnect()">↺ REFRESH</button>
+    </div>
+  </div>
+
+  <button class="new-banner" id="newBanner" onclick="showNewNotes()">▲ NEW NOTES — CLICK TO LOAD</button>
+
+  <div class="loading-state" id="loadingState">
+    <div class="loading-gang">TUNING IN</div>
+    <div class="loading-sub">CONNECTING TO THE NETWORK...</div>
+  </div>
+
+  <div class="error-state" id="errorState">
+    <div class="error-title">CONNECTION LOST</div>
+    <div class="error-msg" id="errorMsg">Failed to connect to relays. Try refreshing.</div>
+  </div>
+
+  <div class="notes-list" id="notesList"></div>
+</div>
+
+<footer>
+  <div class="footer-text">NOSTRGANG.COM ◆ <span>BUILT ON NOSTR</span> ◆ NIP-01 · NIP-07</div>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONFIG ───────────────────────────────────────────────
+const RELAYS = [
+  { id: 'relay-0', url: 'wss://relay.damus.io' },
+  { id: 'relay-1', url: 'wss://nos.lol' },
+  { id: 'relay-2', url: 'wss://relay.nostr.band' },
+  { id: 'relay-3', url: 'wss://nostr.wine' },
+];
+const MAX_NOTES = 100;
+const FETCH_LIMIT = 50;
+const MAX_CHARS = 280;
+
+// ── STATE ────────────────────────────────────────────────
+let notes = [], pendingNotes = [], sockets = [];
+let profiles = {}, connectedCount = 0;
+let currentUser = null;
+
+// ── TOAST ────────────────────────────────────────────────
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 3200);
+}
+
+// ── NIP-07 LOGIN ─────────────────────────────────────────
+async function loginWithNip07() {
+  if (!window.nostr) {
+    showToast('NO SIGNER FOUND — INSTALL ALBY OR NOS2X', 'error');
+    document.getElementById('composeWrap').classList.add('visible');
+    document.getElementById('nip07Prompt').classList.add('visible');
+    return;
+  }
+  try {
+    const pubkey = await window.nostr.getPublicKey();
+    currentUser = { pubkey };
+    document.getElementById('loginBtn').style.display = 'none';
+    document.getElementById('userChip').classList.add('visible');
+    document.getElementById('composeWrap').classList.add('visible');
+    document.getElementById('chipName').textContent = shortKey(pubkey);
+    fetchProfile(pubkey, true);
+    showToast('WELCOME TO THE GANG ◆', 'success');
+  } catch {
+    showToast('LOGIN CANCELLED', 'error');
+  }
+}
+
+function logout() {
+  currentUser = null;
+  document.getElementById('loginBtn').style.display = '';
+  document.getElementById('userChip').classList.remove('visible');
+  document.getElementById('composeWrap').classList.remove('visible');
+  document.getElementById('chipAvatar').innerHTML = '?';
+  document.getElementById('chipName').textContent = 'ANON';
+  showToast('LOGGED OUT');
+}
+
+// ── COMPOSE ──────────────────────────────────────────────
+function updateCharCount() {
+  const txt = document.getElementById('composeText').value;
+  const len = txt.length;
+  const count = document.getElementById('charCount');
+  count.textContent = `${len} / ${MAX_CHARS}`;
+  count.className = 'char-count' + (len > MAX_CHARS ? ' over' : len > MAX_CHARS * 0.85 ? ' warn' : '');
+  document.getElementById('postBtn').disabled = len === 0 || len > MAX_CHARS;
+}
+
+async function publishNote() {
+  if (!window.nostr) {
+    document.getElementById('nip07Prompt').classList.add('visible');
+    return;
+  }
+  if (!currentUser) { showToast('LOGIN FIRST', 'error'); return; }
+
+  const content = document.getElementById('composeText').value.trim();
+  if (!content) return;
+
+  const btn = document.getElementById('postBtn');
+  btn.disabled = true;
+  btn.textContent = 'SIGNING...';
+
+  try {
+    const event = {
+      kind: 1,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [],
+      content,
+      pubkey: currentUser.pubkey,
+    };
+    event.id = await calcEventId(event);
+    const signed = await window.nostr.signEvent(event);
+
+    let sent = 0;
+    sockets.forEach(ws => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(['EVENT', signed]));
+        sent++;
+      }
+    });
+
+    if (sent > 0) {
+      document.getElementById('composeText').value = '';
+      updateCharCount();
+      showToast(`BROADCAST TO ${sent} RELAY${sent > 1 ? 'S' : ''} ◆`, 'success');
+    } else {
+      showToast('NO RELAYS CONNECTED', 'error');
+    }
+  } catch {
+    showToast('SIGNING FAILED OR CANCELLED', 'error');
+  }
+
+  btn.textContent = 'BROADCAST ◆';
+  updateCharCount();
+}
+
+async function calcEventId(event) {
+  const serialized = JSON.stringify([0, event.pubkey, event.created_at, event.kind, event.tags, event.content]);
+  const buf = new TextEncoder().encode(serialized);
+  const hash = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// ── RELAY CONNECT ────────────────────────────────────────
+function connectToRelay(relay) {
+  const ws = new WebSocket(relay.url);
+  const pill = document.getElementById(relay.id);
+
+  ws.onopen = () => {
+    connectedCount++;
+    pill.classList.add('connected');
+    updateStatus();
+    ws.send(JSON.stringify(['REQ', 'global-feed', { kinds: [1], limit: FETCH_LIMIT }]));
+    ws.send(JSON.stringify(['REQ', 'live-feed', { kinds: [1], since: Math.floor(Date.now() / 1000) }]));
+  };
+
+  ws.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg[0] !== 'EVENT') return;
+      const event = msg[2];
+      if (event.kind === 0) { handleProfileEvent(event); return; }
+      if (event.kind === 1 && event.content?.trim()) handleEvent(event, msg[1] === 'live-feed');
+    } catch {}
+  };
+
+  ws.onerror = () => {
+    pill.style.borderColor = '#e81c1c33';
+    pill.style.color = '#e81c1c66';
+  };
+
+  ws.onclose = () => {
+    if (pill.classList.contains('connected')) {
+      connectedCount = Math.max(0, connectedCount - 1);
+      pill.classList.remove('connected');
+      updateStatus();
+    }
+  };
+
+  return ws;
+}
+
+function updateStatus() {
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('statusText');
+  if (connectedCount > 0) {
+    dot.className = 'dot live';
+    txt.textContent = `${connectedCount} RELAY${connectedCount > 1 ? 'S' : ''} LIVE`;
+  } else {
+    dot.className = 'dot connecting';
+    txt.textContent = 'CONNECTING';
+  }
+}
+
+// ── EVENT HANDLING ───────────────────────────────────────
+function handleEvent(event, isLive = false) {
+  if (notes.find(n => n.id === event.id) || pendingNotes.find(n => n.id === event.id)) return;
+  if (isLive && notes.length > 0) {
+    pendingNotes.unshift(event);
+    const banner = document.getElementById('newBanner');
+    banner.classList.add('visible');
+    banner.textContent = `▲ ${pendingNotes.length} NEW NOTE${pendingNotes.length > 1 ? 'S' : ''} — CLICK TO LOAD`;
+  } else {
+    insertNote(event);
+  }
+}
+
+function insertNote(event) {
+  notes.unshift(event);
+  notes.sort((a, b) => b.created_at - a.created_at);
+  if (notes.length > MAX_NOTES) notes = notes.slice(0, MAX_NOTES);
+  renderFeed();
+  fetchProfile(event.pubkey);
+  document.getElementById('noteCount').textContent = `${notes.length} NOTES`;
+  document.getElementById('loadingState').style.display = 'none';
+}
+
+function showNewNotes() {
+  pendingNotes.forEach(n => insertNote(n));
+  pendingNotes = [];
+  document.getElementById('newBanner').classList.remove('visible');
+}
+
+// ── RENDER ───────────────────────────────────────────────
+function renderFeed() {
+  const list = document.getElementById('notesList');
+  list.innerHTML = '';
+  notes.forEach(event => list.appendChild(buildCard(event, profiles[event.pubkey] || {})));
+}
+
+function buildCard(event, profile) {
+  const card = document.createElement('div');
+  const isOwn = currentUser && event.pubkey === currentUser.pubkey;
+  card.className = 'note-card' + (isOwn ? ' own-note' : '');
+  card.dataset.id = event.id;
+
+  const name = profile.name || profile.display_name || shortKey(event.pubkey);
+  const initials = name.slice(0, 2).toUpperCase();
+  const avatarInner = profile.picture
+    ? `<img src="${escHtml(profile.picture)}" alt="${escHtml(name)}" onerror="this.parentElement.textContent='${escHtml(initials)}'">`
+    : escHtml(initials);
+
+  card.innerHTML = `
+    <div class="note-meta">
+      <div class="note-avatar">${avatarInner}</div>
+      <div class="note-user">
+        <div class="note-name">${escHtml(name)}</div>
+        <div class="note-pubkey">${shortKey(event.pubkey)}</div>
+      </div>
+      <div class="note-time">${formatTime(event.created_at)}</div>
+    </div>
+    <div class="note-content">${formatContent(event.content)}</div>
+  `;
+  return card;
+}
+
+function updateCardProfile(pubkey, profile) {
+  const name = profile.name || profile.display_name || shortKey(pubkey);
+  const initials = name.slice(0, 2).toUpperCase();
+  document.querySelectorAll('.note-card').forEach(card => {
+    const note = notes.find(n => n.id === card.dataset.id);
+    if (!note || note.pubkey !== pubkey) return;
+    const el = card.querySelector('.note-name');
+    if (el) el.textContent = name;
+    const av = card.querySelector('.note-avatar');
+    if (av) av.innerHTML = profile.picture
+      ? `<img src="${escHtml(profile.picture)}" onerror="this.parentElement.textContent='${escHtml(initials)}'">`
+      : escHtml(initials);
+  });
+  if (currentUser && pubkey === currentUser.pubkey) {
+    currentUser.profile = profile;
+    document.getElementById('chipName').textContent = name;
+    const ca = document.getElementById('chipAvatar');
+    ca.innerHTML = profile.picture
+      ? `<img src="${escHtml(profile.picture)}" onerror="this.parentElement.textContent='${escHtml(initials)}'">`
+      : escHtml(initials);
+  }
+}
+
+// ── PROFILE FETCH ────────────────────────────────────────
+const profileQueue = new Set();
+let profileTimer = null;
+
+function fetchProfile(pubkey, immediate = false) {
+  if (profiles[pubkey]) return;
+  profileQueue.add(pubkey);
+  if (profileTimer) clearTimeout(profileTimer);
+  profileTimer = setTimeout(flushProfileQueue, immediate ? 50 : 400);
+}
+
+function flushProfileQueue() {
+  if (!profileQueue.size) return;
+  const ws = sockets.find(s => s.readyState === WebSocket.OPEN);
+  if (!ws) return;
+  const keys = [...profileQueue];
+  profileQueue.clear();
+  ws.send(JSON.stringify(['REQ', `profiles-${Date.now()}`, { kinds: [0], authors: keys, limit: keys.length }]));
+}
+
+function handleProfileEvent(event) {
+  try {
+    const meta = JSON.parse(event.content);
+    profiles[event.pubkey] = meta;
+    updateCardProfile(event.pubkey, meta);
+  } catch {}
+}
+
+// ── UTILS ────────────────────────────────────────────────
+function shortKey(k) { return k.slice(0, 8) + '…' + k.slice(-4); }
+
+function formatTime(ts) {
+  const diff = Math.floor(Date.now() / 1000) - ts;
+  if (diff < 60) return `${diff}s`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+  return `${Math.floor(diff / 86400)}d`;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function formatContent(c) {
+  return escHtml(c).replace(/(https?:\/\/[^\s<>"']+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+}
+
+// ── RECONNECT ────────────────────────────────────────────
+function reconnect() {
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled = true;
+  sockets.forEach(ws => { try { ws.close(); } catch {} });
+  sockets = []; connectedCount = 0; notes = []; pendingNotes = [];
+  document.getElementById('notesList').innerHTML = '';
+  document.getElementById('loadingState').style.display = '';
+  document.getElementById('errorState').style.display = 'none';
+  document.getElementById('noteCount').textContent = '0 NOTES';
+  document.getElementById('newBanner').classList.remove('visible');
+  RELAYS.forEach(r => {
+    const el = document.getElementById(r.id);
+    el.classList.remove('connected');
+    el.style.borderColor = ''; el.style.color = '';
+  });
+  updateStatus();
+  setTimeout(() => { init(); btn.disabled = false; }, 500);
+}
+
+// ── INIT ─────────────────────────────────────────────────
+function init() {
+  sockets = RELAYS.map(connectToRelay);
+  setTimeout(() => {
+    if (notes.length === 0) {
+      document.getElementById('loadingState').style.display = 'none';
+      document.getElementById('errorState').style.display = '';
+    }
+  }, 12000);
+}
+
+init();
+</script>
+</body>
+</html>
