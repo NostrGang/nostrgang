@@ -301,6 +301,42 @@
   .note-content { font-family: var(--body-font); font-weight: 300; font-size: 16px; line-height: 1.55; color: var(--white); word-break: break-word; white-space: pre-wrap; }
   .note-content a { color: var(--yellow); text-decoration: none; border-bottom: 1px solid var(--yellow); }
   .note-content a:hover { color: var(--orange); border-color: var(--orange); }
+
+  /* LIKES */
+  .note-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+  .like-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--gray);
+    letter-spacing: 1px;
+    padding: 2px 0;
+    transition: color 0.15s;
+    user-select: none;
+  }
+  .like-btn:hover { color: var(--red); }
+  .like-btn.liked { color: var(--red); }
+  .like-btn.liked .like-heart { animation: heartPop 0.25s ease-out; }
+  .like-btn:disabled { cursor: default; opacity: 0.5; }
+  .like-heart { font-size: 14px; line-height: 1; }
+  .like-count { font-size: 11px; }
+  @keyframes heartPop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.5); }
+    100% { transform: scale(1); }
+  }
  
   .error-state { padding: 48px 0; text-align: center; display: none; }
   .error-title { font-family: var(--gang-font); font-size: 36px; letter-spacing: 4px; color: var(--red); margin-bottom: 8px; }
@@ -374,8 +410,8 @@
  
 <!-- FEED TOGGLE (only visible when logged in) -->
 <div class="feed-toggle" id="feedToggle">
-  <button class="toggle-btn active" id="btnGlobal" onclick="switchFeed('global')">◆ GLOBAL</button>
-  <button class="toggle-btn" id="btnFollowing" onclick="switchFeed('following')">◆ FOLLOWING</button>
+  <button class="toggle-btn" id="btnGlobal" onclick="switchFeed('global')">◆ GLOBAL</button>
+  <button class="toggle-btn active" id="btnFollowing" onclick="switchFeed('following')">◆ FOLLOWING</button>
 </div>
  
 <div class="compose-wrap" id="composeWrap">
@@ -440,7 +476,7 @@
 </div>
  
 <footer>
-  <div class="footer-text">NOSTRGANG.COM ◆ <span>BUILT ON NOSTR</span> ◆ NIP-01 · NIP-02 · NIP-07</div>
+  <div class="footer-text">NOSTRGANG.COM ◆ <span>BUILT ON NOSTR</span> ◆ NIP-01 · NIP-02 · NIP-07 · NIP-25</div>
 </footer>
  
 <div class="toast" id="toast"></div>
@@ -462,9 +498,16 @@ let notes = [], pendingNotes = [], sockets = [];
 let profiles = {}, connectedCount = 0;
 let currentUser = null;
 let currentFeed = 'global'; // 'global' | 'following'
-let followList = [];        // pubkeys the user follows
-let followingNotes = [];    // notes for following feed
+let followList = [];
+let followingNotes = [];
 let followingPending = [];
+
+// ── LIKES STATE (NIP-25) ─────────────────────────────────
+// likeCounts[noteId] = number
+// myLikes = Set of noteIds the current user has liked
+// likedEventIds[noteId] = the kind-7 event id we published (for dedup)
+let likeCounts = {};
+let myLikes = new Set();
  
 // ── TOAST ────────────────────────────────────────────────
 function showToast(msg, type = '') {
@@ -493,6 +536,9 @@ async function loginWithNip07() {
     document.getElementById('chipName').textContent = shortKey(pubkey);
     fetchProfile(pubkey, true);
     showToast('WELCOME TO THE GANG ◆', 'success');
+
+    // Switch to following feed as default for logged-in users
+    switchFeed('following');
   } catch {
     showToast('LOGIN CANCELLED', 'error');
   }
@@ -503,6 +549,7 @@ function logout() {
   followList = [];
   followingNotes = [];
   followingPending = [];
+  myLikes = new Set();
   currentFeed = 'global';
   document.getElementById('loginBtn').style.display = '';
   document.getElementById('userChip').classList.remove('visible');
@@ -513,13 +560,14 @@ function logout() {
   document.getElementById('logoTag').textContent = '// public feed';
   document.getElementById('btnGlobal').classList.add('active');
   document.getElementById('btnFollowing').classList.remove('active');
+  document.getElementById('feedTitle').innerHTML = 'LIVE <span>FEED</span>';
   renderCurrentFeed();
   showToast('LOGGED OUT');
 }
  
 // ── FEED TOGGLE ──────────────────────────────────────────
 function switchFeed(feed) {
-  if (feed === currentFeed) return;
+  if (feed === currentFeed && document.getElementById('notesList').children.length > 0) return;
   currentFeed = feed;
  
   document.getElementById('btnGlobal').classList.toggle('active', feed === 'global');
@@ -546,7 +594,6 @@ function fetchFollowList() {
   const ws = sockets.find(s => s.readyState === WebSocket.OPEN);
   if (!ws) { showToast('NO RELAY CONNECTED', 'error'); return; }
  
-  // Show loading
   document.getElementById('followingLoading').classList.add('visible');
   document.getElementById('noFollows').classList.remove('visible');
   document.getElementById('notesList').innerHTML = '';
@@ -557,7 +604,6 @@ function fetchFollowList() {
     { kinds: [3], authors: [currentUser.pubkey], limit: 1 }
   ]));
  
-  // Timeout if no follow list found
   setTimeout(() => {
     if (followList.length === 0 && currentFeed === 'following') {
       document.getElementById('followingLoading').classList.remove('visible');
@@ -567,7 +613,6 @@ function fetchFollowList() {
 }
  
 function handleFollowList(event) {
-  // Extract p tags — each is a followed pubkey
   const follows = event.tags
     .filter(t => t[0] === 'p' && t[1])
     .map(t => t[1]);
@@ -581,7 +626,6 @@ function handleFollowList(event) {
   followList = follows;
   document.getElementById('followingLoading').classList.remove('visible');
  
-  // Now subscribe to notes from followed pubkeys
   sockets.forEach(ws => {
     if (ws.readyState !== WebSocket.OPEN) return;
     ws.send(JSON.stringify([
@@ -595,6 +639,104 @@ function handleFollowList(event) {
   });
  
   showToast(`CREW LOADED — ${follows.length} FOLLOWS`, 'success');
+}
+
+// ── LIKES (NIP-25) ───────────────────────────────────────
+function fetchLikesForNotes(noteIds) {
+  if (!noteIds.length) return;
+  const ws = sockets.find(s => s.readyState === WebSocket.OPEN);
+  if (!ws) return;
+  // Fetch kind 7 reactions for visible notes
+  ws.send(JSON.stringify([
+    'REQ', `likes-${Date.now()}`,
+    { kinds: [7], '#e': noteIds, limit: 500 }
+  ]));
+}
+
+function handleLikeEvent(event) {
+  // Only count '+' reactions (NIP-25 standard like)
+  if (event.content !== '+' && event.content !== '❤️' && event.content !== '🤙') return;
+  // Find the e tag — the note being liked
+  const eTag = event.tags.find(t => t[0] === 'e');
+  if (!eTag || !eTag[1]) return;
+  const noteId = eTag[1];
+
+  // Increment count
+  if (likeCounts[noteId] === undefined) likeCounts[noteId] = 0;
+  // Avoid double-counting same event
+  if (event._counted) return;
+  event._counted = true;
+  likeCounts[noteId]++;
+
+  // Track if this is our own like
+  if (currentUser && event.pubkey === currentUser.pubkey) {
+    myLikes.add(noteId);
+  }
+
+  // Update any visible like button for this note
+  updateLikeButton(noteId);
+}
+
+function updateLikeButton(noteId) {
+  const btn = document.querySelector(`.like-btn[data-note-id="${noteId}"]`);
+  if (!btn) return;
+  const count = likeCounts[noteId] || 0;
+  const liked = myLikes.has(noteId);
+  btn.classList.toggle('liked', liked);
+  btn.querySelector('.like-count').textContent = count > 0 ? count : '';
+}
+
+async function toggleLike(noteId, authorPubkey) {
+  if (!currentUser) {
+    showToast('LOGIN TO LIKE NOTES', 'error');
+    return;
+  }
+  if (!window.nostr) {
+    showToast('NO SIGNER FOUND', 'error');
+    return;
+  }
+  if (myLikes.has(noteId)) {
+    showToast('ALREADY LIKED ◆', '');
+    return;
+  }
+
+  const btn = document.querySelector(`.like-btn[data-note-id="${noteId}"]`);
+  if (btn) btn.disabled = true;
+
+  try {
+    const event = {
+      kind: 7,
+      created_at: Math.floor(Date.now() / 1000),
+      content: '+',
+      tags: [
+        ['e', noteId],
+        ['p', authorPubkey],
+      ],
+      pubkey: currentUser.pubkey,
+    };
+    event.id = await calcEventId(event);
+    const signed = await window.nostr.signEvent(event);
+
+    let sent = 0;
+    sockets.forEach(ws => {
+      if (ws.readyState === WebSocket.OPEN) { ws.send(JSON.stringify(['EVENT', signed])); sent++; }
+    });
+
+    if (sent > 0) {
+      // Optimistic update
+      myLikes.add(noteId);
+      if (likeCounts[noteId] === undefined) likeCounts[noteId] = 0;
+      likeCounts[noteId]++;
+      updateLikeButton(noteId);
+      showToast('◆ LIKED', 'success');
+    } else {
+      showToast('NO RELAYS CONNECTED', 'error');
+    }
+  } catch {
+    showToast('SIGNING FAILED OR CANCELLED', 'error');
+  }
+
+  if (btn) btn.disabled = false;
 }
  
 // ── COMPOSE ──────────────────────────────────────────────
@@ -677,6 +819,7 @@ function connectToRelay(relay) {
       const subId = msg[1];
       if (event.kind === 0) { handleProfileEvent(event); return; }
       if (event.kind === 3) { handleFollowList(event); return; }
+      if (event.kind === 7) { handleLikeEvent(event); return; }
       if (event.kind === 1 && event.content?.trim()) {
         if (subId === 'following-feed' || subId === 'following-live') {
           handleFollowingEvent(event, subId === 'following-live');
@@ -785,6 +928,10 @@ function renderCurrentFeed() {
   const feedNotes = currentFeed === 'global' ? notes : followingNotes;
   feedNotes.forEach(event => list.appendChild(buildCard(event, profiles[event.pubkey] || {})));
   document.getElementById('noteCount').textContent = `${feedNotes.length} NOTES`;
+
+  // Fetch likes for all visible notes
+  const noteIds = feedNotes.map(n => n.id);
+  if (noteIds.length) fetchLikesForNotes(noteIds);
 }
  
 function buildCard(event, profile) {
@@ -798,6 +945,11 @@ function buildCard(event, profile) {
   const avatarInner = profile.picture
     ? `<img src="${escHtml(profile.picture)}" alt="${escHtml(name)}" onerror="this.parentElement.textContent='${escHtml(initials)}'">`
     : escHtml(initials);
+
+  const count = likeCounts[event.id] || 0;
+  const liked = myLikes.has(event.id);
+  const likedClass = liked ? ' liked' : '';
+  const countStr = count > 0 ? count : '';
  
   card.innerHTML = `
     <div class="note-meta">
@@ -809,6 +961,12 @@ function buildCard(event, profile) {
       <div class="note-time">${formatTime(event.created_at)}</div>
     </div>
     <div class="note-content">${formatContent(event.content)}</div>
+    <div class="note-actions">
+      <button class="like-btn${likedClass}" data-note-id="${escHtml(event.id)}" data-author="${escHtml(event.pubkey)}" onclick="toggleLike('${escHtml(event.id)}', '${escHtml(event.pubkey)}')">
+        <span class="like-heart">♥</span>
+        <span class="like-count">${countStr}</span>
+      </button>
+    </div>
   `;
   return card;
 }
@@ -892,6 +1050,7 @@ function reconnect() {
   sockets = []; connectedCount = 0;
   notes = []; pendingNotes = [];
   followingNotes = []; followingPending = []; followList = [];
+  likeCounts = {}; myLikes = new Set();
   document.getElementById('notesList').innerHTML = '';
   document.getElementById('loadingState').style.display = '';
   document.getElementById('errorState').style.display = 'none';
